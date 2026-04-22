@@ -18,7 +18,7 @@ int createSocket() {
 
 	address.sin_family = AF_INET;
 	address.sin_addr.s_addr = INADDR_ANY;
-	address.sin_port = htons(PORT);	
+	address.sin_port = htons(PORT);
 
 	if (bind(server_fd, (struct sockaddr*) &address, sizeof(address)) < 0) {
 		perror("[!] Socket binding failed: ");
@@ -28,51 +28,55 @@ int createSocket() {
 	return 0;
 }
 
-void responseToClient(int *clientSocket, char* path) {
+void responseToClient(int *clientSocket, char *path) {
 	int status = 200;
-	char* reasonPhrase = "OK";
-	char* contentType;
-	long contentLength = 0;
-	char* body = getPage(path, &contentLength);
- 
-	if (body == NULL) { // not found
+	char *reasonPhrase = "OK";
+	long fileSize = 0;
+
+	char *body = getPage(path, &fileSize);
+	if (!body) {
 		status = 404;
 		reasonPhrase = "Not Found";
-		body = getPage("/404", &contentLength);
-	} else contentType = getContentType(path);
+		body = strdup("Not Found"); // heap allocated so free() is safe
+		fileSize = strlen(body);
+	}
 
-	struct ResponseHeaders rh = {status, reasonPhrase, contentType, contentLength, body};
-	char* response = returnResponse(&rh);
+	char *contentType = getContentType(path);
 
-	send(*clientSocket, response, contentLength, 0);
-	send(*clientSocket, body, contentLength, 0);
-	free(response);
+	struct ResponseHeaders rh = {status, reasonPhrase, contentType, fileSize};
+	char headers[256];
+	returnResponse(&rh, headers, sizeof(headers));
+
+	send(*clientSocket, headers, strlen(headers), 0); // strlen fine, headers are text
+	send(*clientSocket, body, fileSize, 0);            // fileSize correct for binary
+
 	free(body);
 }
 
 void listenToConnections() {
-  int clientSocket;
+	int clientSocket;
 
-  if (listen(server_fd, 3) < 0) {  // moved outside loop
-    perror("[!] Listening failed.");
-    exit(1);
-  }
+	if (listen(server_fd, 3) < 0) {
+		perror("[!] Listening failed.");
+		exit(1);
+	}
 
-  while (1) {
-    if ((clientSocket = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
-      perror("[!] Failed to accept client connection.");
-      continue;
-    }
+	while (1) {
+		if ((clientSocket = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
+			perror("[!] Failed to accept client connection.");
+			continue;
+		}
 
-    char requestBuffer[1024] = {0};
-    read(clientSocket, requestBuffer, sizeof(requestBuffer) - 1);
+		char requestBuffer[1024] = {0};
+		read(clientSocket, requestBuffer, sizeof(requestBuffer) - 1);
 
-    char method[8], path[256], version[16];
-    sscanf(requestBuffer, "%s %s %s", method, path, version);
-    printf("[+] Method: %s\n", method);
-    printf("[+] Requested path: %s\n\n", path);
+		char method[8], path[256], version[16];
+		sscanf(requestBuffer, "%s %s %s", method, path, version);
+		printf("[+] Method: %s\n", method);
+		printf("[+] Requested path: %s\n\n", path);
 
-    responseToClient(&clientSocket, path);
-    close(clientSocket);
-  }
+		responseToClient(&clientSocket, path);
+
+		close(clientSocket);
+	}
 }

@@ -16,21 +16,16 @@ struct ResponseHeaders {
 	int status;
 	char* reasonPhrase;
 	char* contentType;
-	int contentLength;
-	char* body;
+	long contentLength;
 };
 
-char* returnResponse(struct ResponseHeaders *rh) {
-  char* response = malloc(strlen(rh->body) + 256);
-  if (!response) { perror("malloc: "); return NULL; }
-
-  snprintf(response, strlen(rh->body) + 256,
-    "HTTP/1.1 %d %s\r\n"
-    "Content-Type: %s\r\n"
-    "Content-Length: %zu\r\n"
-    "\r\n"
-    rh->status, rh->reasonPhrase, rh->contentType, strlen(response)
-  );
-
-  return response;
+char* returnResponse(struct ResponseHeaders *rh, char* buffer, size_t bufferSize) {
+	snprintf(buffer, bufferSize,
+		"HTTP/1.1 %d %s\r\n"
+		"Content-Type: %s\r\n"
+		"Content-Length: %ld\r\n"
+		"\r\n",
+		rh->status, rh->reasonPhrase, rh->contentType, rh->contentLength
+	);
+	return buffer;
 }
