@@ -11,6 +11,7 @@ int createSocket() {
 		return -1;
 	}
 
+
 	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
 		perror("[!] Socket port failed: ");
 		return -1;
@@ -32,6 +33,9 @@ void responseToClient(int *clientSocket, char *path) {
 	int status = 200;
 	char *reasonPhrase = "OK";
 	long fileSize = 0;
+
+	char *q = strchr(path, '?');
+	if (q) *q = '\0'; // truncate at '?'
 
 	char *body = getPage(path, &fileSize);
 	if (!body) {
@@ -55,6 +59,9 @@ void responseToClient(int *clientSocket, char *path) {
 
 void listenToConnections() {
 	int clientSocket;
+	struct timeval timeout = {5, 0}; // 5 seconds
+	setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
 
 	if (listen(server_fd, 3) < 0) {
 		perror("[!] Listening failed.");
@@ -75,7 +82,11 @@ void listenToConnections() {
 		printf("[+] Method: %s\n", method);
 		printf("[+] Requested path: %s\n\n", path);
 
-		responseToClient(&clientSocket, path);
+		if (fork() == 0) {
+			responseToClient(&clientSocket, path);
+			close(clientSocket);
+			exit(0);
+		}
 
 		close(clientSocket);
 	}

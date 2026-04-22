@@ -23,9 +23,13 @@ char* returnResponse(struct ResponseHeaders *rh, char* buffer, size_t bufferSize
 	snprintf(buffer, bufferSize,
 		"HTTP/1.1 %d %s\r\n"
 		"Content-Type: %s\r\n"
-		"Content-Length: %ld\r\n"
-		"\r\n",
+		"Content-Length: %ld\r\n",
 		rh->status, rh->reasonPhrase, rh->contentType, rh->contentLength
 	);
+
+	if (strcmp(rh->contentType, "text/html") != 0) {
+		strcat(buffer, "Cache-Control: max-age=3600\r\n");
+	} strcat(buffer, "\r\n");
+
 	return buffer;
 }
