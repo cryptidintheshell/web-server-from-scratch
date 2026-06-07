@@ -59,7 +59,22 @@ void listenToConnections() {
 			exit(1);
 		}
 
-		char* html = readFile("index.html");
+		char requestBuffer[1024];
+		ssize_t request = read(clientSocket, requestBuffer, sizeof(requestBuffer) - 1);
+
+		char method[8], path[256], version[16];
+		sscanf(requestBuffer, "%s %s %s", method, path, version);
+		printf("[+] Method: %s\n", method);
+		printf("[+] Requested path: %s\n", path);
+
+		char *body = getPage(path);
+		if (!body) {
+	    // send 404
+		} else {
+			char* html = readFile(path);
+	    free(body);
+		}
+
 		responseToClient(&clientSocket, html);
 		free(html);
 	}

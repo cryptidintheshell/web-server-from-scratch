@@ -23,3 +23,20 @@ char* readFile(char* path) {
 	fclose(fileptr);
 	return content;
 }
+
+int checkIfPathExists(char* path) {
+	DIR* dir = opendir(path);
+	if (dir) return 0;									// found
+	else if (ENOENT == errno) return 1; // not found
+	else return -1; 										// opendir error
+}
+
+char* getPage(char* requestPath) {
+  char filepath[512];
+  snprintf(filepath, sizeof(filepath), "pages%s", requestPath); // "pages/index.html"
+
+  FILE *f = fopen(filepath, "r");
+  if (!f) return NULL; // 404
+
+  return readFile(filepath);
+}
