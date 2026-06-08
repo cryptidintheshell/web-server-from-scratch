@@ -33,7 +33,11 @@ int checkIfPathExists(char* path) {
 
 char* getPage(char* requestPath) {
   char filepath[512];
-  snprintf(filepath, sizeof(filepath), "pages%s", requestPath); // "pages/index.html"
+
+  if (strcmp(requestPath, "/") == 0) strcpy(filepath, "pages/index.html"); // default to main page
+	else snprintf(filepath, sizeof(filepath), "pages%s/index.html", requestPath); // default to index.html
+
+	printf("[+] Response path: %s\n\n", filepath);	
 
   FILE *f = fopen(filepath, "r");
   if (!f) return NULL; // 404

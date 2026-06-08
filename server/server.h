@@ -46,36 +46,37 @@ void responseToClient(int *clientSocket, char* body) {
 }
 
 void listenToConnections() {
-	int clientSocket;
+    int clientSocket;
 
-	while(1) {
-		if (listen(server_fd, 3) < 0) {
-			perror("[!] Listening to connection failed.");
-			exit(1);
-		}
+    if (listen(server_fd, 3) < 0) {  // moved outside loop
+      perror("[!] Listening failed.");
+      exit(1);
+    }
 
-		if ((clientSocket = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
-			perror("[!] Failed to accept client connection.");
-			exit(1);
-		}
+    while (1) {
+      if ((clientSocket = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
+        perror("[!] Failed to accept client connection.");
+        continue;
+      }
 
-		char requestBuffer[1024];
-		ssize_t request = read(clientSocket, requestBuffer, sizeof(requestBuffer) - 1);
+      char requestBuffer[1024] = {0};
+      read(clientSocket, requestBuffer, sizeof(requestBuffer) - 1);
 
-		char method[8], path[256], version[16];
-		sscanf(requestBuffer, "%s %s %s", method, path, version);
-		printf("[+] Method: %s\n", method);
-		printf("[+] Requested path: %s\n", path);
+      char method[8], path[256], version[16];
+      sscanf(requestBuffer, "%s %s %s", method, path, version);
+      printf("[+] Method: %s\n", method);
+      printf("[+] Requested path: %s\n\n", path);
 
-		char *body = getPage(path);
-		if (!body) {
-	    // send 404
-		} else {
-			char* html = readFile(path);
-	    free(body);
-		}
+      char *html = getPage(path);
+      if (!html) {
+        // send 404
+        char *notFound = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
+        send(clientSocket, notFound, strlen(notFound), 0);
+      } else {
+        responseToClient(&clientSocket, html);
+        free(html);
+      }
 
-		responseToClient(&clientSocket, html);
-		free(html);
-	}
+      close(clientSocket); // critical — tells browser the response is done
+    }
 }
