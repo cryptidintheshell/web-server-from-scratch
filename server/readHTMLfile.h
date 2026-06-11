@@ -1,14 +1,14 @@
 #include "headers.h"
 
-char* readFile(char* path) {
-	FILE *fileptr = fopen(path, "r");
+char* readFile(char* path, long *fileSize) {
+	FILE *fileptr = fopen(path, "rb");
 	if (!fileptr) {
 		perror("fopen: "); 
 		return NULL;
 	}
 
 	fseek(fileptr, 0, SEEK_END);
-	long fileSize = ftell(fileptr);
+	*fileSize = ftell(fileptr);
 	rewind(fileptr);
 
 	char* content = calloc(fileSize + 1, 1);
@@ -18,7 +18,7 @@ char* readFile(char* path) {
 		return NULL;
 	}
 
-	fread(content, 1, fileSize, fileptr);
+	fread(content, 1, *fileSize, fileptr);
 
 	fclose(fileptr);
 	return content;
@@ -26,21 +26,39 @@ char* readFile(char* path) {
 
 int checkIfPathExists(char* path) {
 	DIR* dir = opendir(path);
-	if (dir) return 0;									// found
-	else if (ENOENT == errno) return 1; // not found
-	else return -1; 										// opendir error
+	if (dir) return 200;									// found
+	else if (ENOENT == errno) return 404; // not found
+	else return 505; 										// opendir error
 }
 
-char* getPage(char* requestPath) {
+char* getContentType(char* path) {
+  char *ext = strchr(path, '.');
+  if (!ext) return "text/html";
+  if (strcmp(ext, ".css") == 0)  return "text/css";
+  if (strcmp(ext, ".js") == 0)   return "application/javascript";
+  if (strcmp(ext, ".png") == 0)  return "image/png";
+  if (strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0)  return "image/jpeg";
+  if (strcmp(ext, ".ico") == 0)  return "image/x-icon";
+  return "text/html";
+}
+
+char* getPage(char* requestPath, long *fileSize) {
   char filepath[512];
 
-  if (strcmp(requestPath, "/") == 0) strcpy(filepath, "pages/index.html"); // default to main page
-	else snprintf(filepath, sizeof(filepath), "pages%s/index.html", requestPath); // default to index.html
+  char *ext = strchr(requestPath, '.');
+  if (strcmp(requestPath, "/") == 0 || ext == NULL) {
+    if (strcmp(requestPath, "/") == 0) strcpy(filepath, "pages/index.html");
+    else snprintf(filepath, sizeof(filepath), "pages%s/index.html", requestPath);
+  } else snprintf(filepath, sizeof(filepath), "pages%s", requestPath);
 
-	printf("[+] Response path: %s\n\n", filepath);	
+  printf("[+] Response path: %s\n", filepath);
+  if (ext) printf("[+] File type: %s\n\n", ext + 1); // +1 to skip the dot
 
   FILE *f = fopen(filepath, "r");
-  if (!f) return NULL; // 404
+  if (!f) {
+  	printf("File not found\n");
+  	return NULL;
+  }
 
-  return readFile(filepath);
+  return readFile(filepath, fileSize);
 }

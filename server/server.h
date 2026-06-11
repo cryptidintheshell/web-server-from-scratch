@@ -28,55 +28,51 @@ int createSocket() {
 	return 0;
 }
 
-void responseToClient(int *clientSocket, char* body) {
-	char* response = malloc(strlen(body) + 256);
-	if (!response) { perror("malloc"); return; }
+void responseToClient(int *clientSocket, char* path) {
+	int status = 200;
+	char* reasonPhrase = "OK";
+	char* contentType;
+	long contentLength = 0;
+	char* body = getPage(path, &contentLength);
+ 
+	if (body == NULL) { // not found
+		status = 404;
+		reasonPhrase = "Not Found";
+		body = getPage("/404", &contentLength);
+	} else contentType = getContentType(path);
 
-	snprintf(response, strlen(body) + 256,
-		"HTTP/1.1 200 OK\r\n"
-		"Content-type: text/html\r\n"
-		"Content-length: %zu\r\n"
-		"\r\n"
-		"%s",
-		strlen(body), body
-	);
+	struct ResponseHeaders rh = {status, reasonPhrase, contentType, contentLength, body};
+	char* response = returnResponse(&rh);
 
-	send(*clientSocket, response, strlen(response), 0);
+	send(*clientSocket, response, contentLength, 0);
+	send(*clientSocket, body, contentLength, 0);
 	free(response);
+	free(body);
 }
 
 void listenToConnections() {
-    int clientSocket;
+  int clientSocket;
 
-    if (listen(server_fd, 3) < 0) {  // moved outside loop
-      perror("[!] Listening failed.");
-      exit(1);
+  if (listen(server_fd, 3) < 0) {  // moved outside loop
+    perror("[!] Listening failed.");
+    exit(1);
+  }
+
+  while (1) {
+    if ((clientSocket = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
+      perror("[!] Failed to accept client connection.");
+      continue;
     }
 
-    while (1) {
-      if ((clientSocket = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
-        perror("[!] Failed to accept client connection.");
-        continue;
-      }
+    char requestBuffer[1024] = {0};
+    read(clientSocket, requestBuffer, sizeof(requestBuffer) - 1);
 
-      char requestBuffer[1024] = {0};
-      read(clientSocket, requestBuffer, sizeof(requestBuffer) - 1);
+    char method[8], path[256], version[16];
+    sscanf(requestBuffer, "%s %s %s", method, path, version);
+    printf("[+] Method: %s\n", method);
+    printf("[+] Requested path: %s\n\n", path);
 
-      char method[8], path[256], version[16];
-      sscanf(requestBuffer, "%s %s %s", method, path, version);
-      printf("[+] Method: %s\n", method);
-      printf("[+] Requested path: %s\n\n", path);
-
-      char *html = getPage(path);
-      if (!html) {
-        // send 404
-        char *notFound = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
-        send(clientSocket, notFound, strlen(notFound), 0);
-      } else {
-        responseToClient(&clientSocket, html);
-        free(html);
-      }
-
-      close(clientSocket); // critical — tells browser the response is done
-    }
+    responseToClient(&clientSocket, path);
+    close(clientSocket);
+  }
 }
